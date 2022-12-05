@@ -3,8 +3,11 @@
 #include <windows.h>
 #include <string>
 #include <vector>
+#include <array>
 #include <map>
 #include <algorithm>
+
+HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
 class time_type {
 public:
@@ -28,9 +31,9 @@ public:
 class Course {
 public:
     std::string name;
-    long long link;
-    Course(std::string _name, long long _link): name(_name), link(_link) {}
-    Course() { name = std::string(); link = 0; }
+    std::string link;
+    Course(std::string _name, std::string _link): name(_name), link(_link) {}
+    Course() { name = std::string(); link = "Unknown"; }
 };
 
 class Course_time {
@@ -43,12 +46,16 @@ public:
         if(end_time < rhs.end_time) return true;
         else return false;
     }
-    void print() {
-        std::cout << course.name << "\t ";
+    void print(bool empha = false) {
+        if(empha) SetConsoleTextAttribute(hConsole, 15);
+        std::cout << "  " << course.name << "\t ";
         start_time.print();
         std::cout << " - ";
         end_time.print();
-        std::cout << "\t link: " << course.link << std::endl;
+        std::cout << "\t link: ";
+        if(empha) SetConsoleTextAttribute(hConsole, 11);
+        std::cout << course.link << std::endl;
+        SetConsoleTextAttribute(hConsole, 7); //reset
     }
 };
 
@@ -59,7 +66,7 @@ public:
 
     Schedule() {}
 
-    void add_course(std::string _name, long long _link) {
+    void add_course(std::string _name, std::string _link) {
         course_list.insert(make_pair(_name, Course(_name, _link)));
     }
 
@@ -76,7 +83,7 @@ public:
         fin.open(file_name);
         while(true) {
             std::string buffer_name;
-            long long buffer_link;
+            std::string buffer_link;
             fin >> buffer_name;
             if(buffer_name == "end") break;
             fin >> buffer_link;
@@ -110,20 +117,20 @@ public:
             if(_time < time_table.at(i).end_time) {
                 if(time_table.at(i).start_time < _time) {
                     std::cout << "Current course: " << std::endl;
-                    time_table.at(i).print();
-                    i ++;
+                    time_table.at(i).print(true);
                     std::cout << "Upcoming course: " << std::endl;
-                    time_table.at(i).print();
                 }
                 else {
                     std::cout << "Next course: " << std::endl;
-                    time_table.at(i).print();
+                    time_table.at(i).print(true);
                     std::cout << "Upcoming course: " << std::endl;
                 }
                 i ++;
-                time_table.at(i).print();
-                i ++;
-                time_table.at(i).print();
+                while(i < time_table.size()) {
+                    if(time_table.at(i).start_time.day != time_table.at(i - 1).start_time.day) break;
+                    time_table.at(i).print();
+                    i ++;
+                }
                 return;
             }
         }
@@ -132,14 +139,33 @@ public:
 
 };
 
+void print_stat(SYSTEMTIME time) {
+    std::array <std::string, 8> name_of_week = {"null", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+
+    std::cout << time.wYear << "/" << time.wMonth << "/" << time.wDay << " " << name_of_week.at(time.wDayOfWeek) << " ";
+    std::cout << time.wHour << ":";
+    if(time.wMinute < 10) std::cout << 0;
+    std::cout << time.wMinute << std::endl;
+    std::cout << "-----------------------------------------" << std::endl;
+}
+
 int main() {
     SYSTEMTIME cur_systime;
-    GetLocalTime(&cur_systime);
-    time_type cur_time(cur_systime.wDayOfWeek, cur_systime.wHour, cur_systime.wMinute);
     Schedule my_schedule;
     my_schedule.read_course("course.txt");
     my_schedule.read_course_time("course_time.txt");
     my_schedule.sort_course();
-    my_schedule.get_next_course(cur_time);
+
+    while(true) {
+        GetLocalTime(&cur_systime);
+        print_stat(cur_systime);
+        time_type cur_time(cur_systime.wDayOfWeek, cur_systime.wHour, cur_systime.wMinute);
+        my_schedule.get_next_course(cur_time);
+        Sleep(29500);
+        std::cout << "(auto refreshing)" << std::endl;
+        Sleep(500);
+        system("cls");
+    }
+    
     getchar();
 }
